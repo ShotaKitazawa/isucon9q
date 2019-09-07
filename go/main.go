@@ -110,13 +110,13 @@ type ItemUser struct {
 type ItemSimple struct {
 	ID         int64       `json:"id"`
 	SellerID   int64       `json:"seller_id"`
-	Seller     *UserSimple `json:"seller"`
+	Seller     *UserSimple `json:"seller,omitempty"`
 	Status     string      `json:"status"`
 	Name       string      `json:"name"`
 	Price      int         `json:"price"`
 	ImageURL   string      `json:"image_url"`
 	CategoryID int         `json:"category_id"`
-	Category   *Category   `json:"category"`
+	Category   *Category   `json:"category,omitempty"`
 	CreatedAt  int64       `json:"created_at"`
 }
 
