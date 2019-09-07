@@ -1119,7 +1119,7 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error: dbx.Select(&item")
 		return
 	}
-
+	log.Println(items)
 	/*
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
