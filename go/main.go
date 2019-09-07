@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -390,8 +389,6 @@ func initCategoryIDCache() {
 }
 
 func main() {
-	go http.ListenAndServe(":3000", nil)
-
 	defer dbx.Close()
 
 	mux := goji.NewMux()
