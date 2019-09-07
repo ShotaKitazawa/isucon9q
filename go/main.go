@@ -22,6 +22,8 @@ import (
 	goji "goji.io"
 	"goji.io/pat"
 	"golang.org/x/crypto/bcrypt"
+	redistore "gopkg.in/boj/redistore.v1"
+	//"gopkg.in/boj/redistore.v1"
 )
 
 const (
@@ -64,7 +66,7 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
-
+	//pool      *redis.Pool
 	getCategoryByIDCache map[int]Category
 )
 
@@ -103,7 +105,6 @@ type Item struct {
 	UpdatedAt   time.Time `json:"-" db:"updated_at"`
 }
 
-
 type ItemUser struct {
 	ID          int64     `json:"id" db:"id"`
 	SellerID    int64     `json:"seller_id" db:"seller_id"`
@@ -117,7 +118,7 @@ type ItemUser struct {
 	CreatedAt   time.Time `json:"-" db:"created_at"`
 	UpdatedAt   time.Time `json:"-" db:"updated_at"`
 
-	UserID           int64  `db:"user_id"`
+	UserID       int64  `db:"user_id"`
 	AccountName  string `db:"user_account_name"`
 	NumSellItems int    `db:"user_num_sell_items"`
 }
@@ -291,12 +292,30 @@ type resSetting struct {
 }
 
 func init() {
+	var err error
+
+	//store = sessions.NewCookieStore([]byte("abc"))
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "127.0.0.1:6379"
+	}
+	store, err = redistore.NewRediStore(10, "tcp", redisHost, "", []byte("abc"))
+	if err != nil {
+		panic(err)
+	}
 
 	store = sessions.NewCookieStore([]byte("abc"))
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	templates = template.Must(template.ParseFiles(
 		"../public/index.html",
 	))
+
+	//pool = &redis.Pool{
+	//	MaxIdel:     3,
+	//	MaxActive:   0,
+	//	IdleTimeout: 240 * time.Second,
+	//	Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", redisHost) },
+	//}
 
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
@@ -306,7 +325,7 @@ func init() {
 	if port == "" {
 		port = "3306"
 	}
-	_, err := strconv.Atoi(port)
+	_, err = strconv.Atoi(port)
 	if err != nil {
 		log.Fatalf("failed to read DB port number from an environment variable MYSQL_PORT.\nError: %s", err.Error())
 	}
@@ -1985,29 +2004,34 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	if csrfToken != getCSRFToken(r) {
+		log.Print("postSell Error: csrf token error")
 		outputErrorMsg(w, http.StatusUnprocessableEntity, "csrf token error")
 		return
 	}
 
 	categoryID, err := strconv.Atoi(categoryIDStr)
 	if err != nil || categoryID < 0 {
+		log.Print("postSell Error: category id error")
 		outputErrorMsg(w, http.StatusBadRequest, "category id error")
 		return
 	}
 
 	price, err := strconv.Atoi(priceStr)
 	if err != nil {
+		log.Print("postSell Error: price error")
 		outputErrorMsg(w, http.StatusBadRequest, "price error")
 		return
 	}
 
 	if name == "" || description == "" || price == 0 || categoryID == 0 {
+		log.Print("postSell Error: all parameters are required")
 		outputErrorMsg(w, http.StatusBadRequest, "all parameters are required")
 
 		return
 	}
 
 	if price < ItemMinPrice || price > ItemMaxPrice {
+		log.Print("postSell Error: 1 " + ItemPriceErrMsg)
 		outputErrorMsg(w, http.StatusBadRequest, ItemPriceErrMsg)
 
 		return
@@ -2022,6 +2046,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 
 	user, errCode, errMsg := getUser(r)
 	if errMsg != "" {
+		log.Print("postSell Error: 2 " + errMsg)
 		outputErrorMsg(w, errCode, errMsg)
 		return
 	}
@@ -2036,6 +2061,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	ext := filepath.Ext(header.Filename)
 
 	if !(ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif") {
+		log.Print("postSell Error: unsupported image format error")
 		outputErrorMsg(w, http.StatusBadRequest, "unsupported image format error")
 		return
 	}
@@ -2057,6 +2083,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	seller := User{}
 	err = tx.Get(&seller, "SELECT * FROM `users` WHERE `id` = ? FOR UPDATE", user.ID)
 	if err == sql.ErrNoRows {
+		log.Print("postSell Error: user not found")
 		outputErrorMsg(w, http.StatusNotFound, "user not found")
 		tx.Rollback()
 		return
@@ -2255,6 +2282,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	rl := reqLogin{}
 	err := json.NewDecoder(r.Body).Decode(&rl)
 	if err != nil {
+		log.Print("postLogin: json decode error")
 		outputErrorMsg(w, http.StatusBadRequest, "json decode error")
 		return
 	}
@@ -2263,6 +2291,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	password := rl.Password
 
 	if accountName == "" || password == "" {
+		log.Print("postLogin: all parameters are required")
 		outputErrorMsg(w, http.StatusBadRequest, "all parameters are required")
 
 		return
@@ -2271,6 +2300,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	u := User{}
 	err = dbx.Get(&u, "SELECT * FROM `users` WHERE `account_name` = ?", accountName)
 	if err == sql.ErrNoRows {
+		log.Print("postLogin: アカウント名かパスワードが間違えています1")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
@@ -2283,6 +2313,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 
 	err = bcrypt.CompareHashAndPassword(u.HashedPassword, []byte(password))
 	if err == bcrypt.ErrMismatchedHashAndPassword {
+		log.Print("postLogin: アカウント名かパスワードが間違えています2")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
