@@ -363,7 +363,7 @@ func init() {
 func initCategoryIDCache() {
 	//getCategoryByIDCache = make(map[int]Category, 100)
 
-	var category_ids []int
+  var category_ids []int
 	err := dbx.Select(&category_ids, "SELECT id FROM `categories`")
 	if err != nil {
 		panic(err)
@@ -641,18 +641,6 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			return
 		}
-		/*
-			category, err := getCategoryByID(dbx, item.CategoryID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "category not found")
-				return
-			}
-		*/
-		//category, ok := getCategoryByIDCache[item.CategoryID]
-		//if !ok {
-		//	outputErrorMsg(w, http.StatusNotFound, "category not found")
-		//	return
-		//}
 
 		var category Category
 		conn := pool.Get()
@@ -664,7 +652,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := json.Unmarshal(data, &category); err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
+      outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
 
@@ -705,18 +693,6 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*
-		rootCategory, err := getCategoryByID(dbx, rootCategoryID)
-		if err != nil || rootCategory.ParentID != 0 {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			return
-		}
-	*/
-	//rootCategory, ok := getCategoryByIDCache[rootCategoryID]
-	//if !ok {
-	//	outputErrorMsg(w, http.StatusNotFound, "category not found")
-	//	return
-	//}
 	var rootCategory Category
 	conn := pool.Get()
 	data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", rootCategoryID)))
@@ -813,12 +789,6 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		seller.ID = item.SellerID
 		seller.AccountName = item.AccountName
 		seller.NumSellItems = item.NumSellItems
-
-		//category, ok := getCategoryByIDCache[item.CategoryID]
-		//if !ok {
-		//	outputErrorMsg(w, http.StatusNotFound, "category not found")
-		//	return
-		//}
 
 		var category Category
 		conn := pool.Get()
@@ -1067,15 +1037,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		/*
-			category, ok := getCategoryByIDCache[item.CategoryID]
-			if !ok {
-				outputErrorMsg(w, http.StatusNotFound, "category not found")
-				return
-			}
-		*/
-
-		var category Category
+    var category Category
 		conn := pool.Get()
 		data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
 		conn.Close()
@@ -1203,15 +1165,6 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
-
-	/*
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			return
-		}
-	*/
-	//category, ok := getCategoryByIDCache[item.CategoryID]
 
 	var category Category
 	conn := pool.Get()
