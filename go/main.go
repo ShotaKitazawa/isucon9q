@@ -325,7 +325,7 @@ func initCategoryIDCache() {
 	getCategoryByIDCache = make(map[int]Category, 100)
 
 	var category_ids []int
-	err := dbx.Get(&category_ids, "SELECT id FROM `categories`")
+	err := dbx.Select(&category_ids, "SELECT id FROM `categories`")
 	if err != nil {
 		panic(err)
 	}
