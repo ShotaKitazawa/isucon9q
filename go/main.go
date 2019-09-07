@@ -4,7 +4,6 @@ import (
 	crand "crypto/rand"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -330,18 +329,13 @@ func initCategoryIDCache() {
 		panic(err)
 	}
 	for _, id := range category_ids {
-		rootCategory, err := getCategoryByID(dbx, id)
-		fmt.Println("--------")
-		fmt.Printf("Category: ID: %d\n", id)
-		fmt.Printf("rootCategory: ID: %d\n", rootCategory.ID)
-		fmt.Printf("rootCategory: parentID: %d\n", rootCategory.ParentID)
-		fmt.Printf("rootCategory: CategoryName: %s\n", rootCategory.CategoryName)
-		fmt.Printf("rootCategory: ParentCategoryName: %s\n", rootCategory.ParentCategoryName)
+		category, err := getCategoryByID(dbx, id)
 
-		if err != nil || rootCategory.ParentID != 0 {
-			panic(errors.New("category not found"))
-		}
-		getCategoryByIDCache[id] = rootCategory
+		//if err != nil || category.ParentID != 0 {
+		//	panic(errors.New("category not found"))
+		//}
+
+		getCategoryByIDCache[id] = category
 	}
 }
 
