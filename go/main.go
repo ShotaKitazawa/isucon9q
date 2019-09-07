@@ -329,7 +329,7 @@ func initCategoryIDCache() {
 		panic(err)
 	}
 	for _, id := range category_ids {
-		category, err := getCategoryByID(dbx, id)
+		category, _ := getCategoryByID(dbx, id)
 
 		//if err != nil || category.ParentID != 0 {
 		//	panic(errors.New("category not found"))
