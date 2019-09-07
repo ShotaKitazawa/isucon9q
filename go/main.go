@@ -103,7 +103,18 @@ type Item struct {
 
 
 type ItemUser struct {
-	Item Item `json:"-" db:"items"`
+	ID          int64     `json:"id" db:"id"`
+	SellerID    int64     `json:"seller_id" db:"seller_id"`
+	BuyerID     int64     `json:"buyer_id" db:"buyer_id"`
+	Status      string    `json:"status" db:"status"`
+	Name        string    `json:"name" db:"name"`
+	Price       int       `json:"price" db:"price"`
+	Description string    `json:"description" db:"description"`
+	ImageName   string    `json:"image_name" db:"image_name"`
+	CategoryID  int       `json:"category_id" db:"category_id"`
+	CreatedAt   time.Time `json:"-" db:"created_at"`
+	UpdatedAt   time.Time `json:"-" db:"updated_at"`
+
 	UserSimple UserSimple `json:"-" db:"users"`
 }
 
@@ -700,26 +711,26 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
 		seller := new(UserSimple)
-		seller.ID = item.Item.SellerID
+		seller.ID = item.SellerID
 		seller.AccountName = item.UserSimple.AccountName
 		seller.NumSellItems = item.UserSimple.NumSellItems
 
-		category, err := getCategoryByID(dbx, item.Item.CategoryID)
+		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
 		itemSimples = append(itemSimples, ItemSimple{
-			ID:         item.Item.ID,
-			SellerID:   item.Item.SellerID,
+			ID:         item.ID,
+			SellerID:   item.SellerID,
 			Seller:     seller,
-			Status:     item.Item.Status,
-			Name:       item.Item.Name,
-			Price:      item.Item.Price,
-			ImageURL:   getImageURL(item.Item.ImageName),
-			CategoryID: item.Item.CategoryID,
+			Status:     item.Status,
+			Name:       item.Name,
+			Price:      item.Price,
+			ImageURL:   getImageURL(item.ImageName),
+			CategoryID: item.CategoryID,
 			Category:   &category,
-			CreatedAt:  item.Item.CreatedAt.Unix(),
+			CreatedAt:  item.CreatedAt.Unix(),
 		})
 	}
 
