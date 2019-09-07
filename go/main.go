@@ -690,26 +690,14 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			return
-		}
 		itemSimples = append(itemSimples, ItemSimple{
 			ID:         item.ID,
 			SellerID:   item.SellerID,
-			Seller:     &seller,
 			Status:     item.Status,
 			Name:       item.Name,
 			Price:      item.Price,
 			ImageURL:   getImageURL(item.ImageName),
 			CategoryID: item.CategoryID,
-			Category:   &category,
 			CreatedAt:  item.CreatedAt.Unix(),
 		})
 	}
