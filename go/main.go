@@ -1109,14 +1109,14 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item := ItemUser{}
-	err = dbx.Select(&item, "SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `items`.`id` = ?", itemID)
+	err = dbx.Select(&item, "SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.id = ?", itemID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "item not found")
 		return
 	}
 	if err != nil {
 		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		outputErrorMsg(w, http.StatusInternalServerError, "db error: dbx.Select(&item")
 		return
 	}
 
