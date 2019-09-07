@@ -1108,8 +1108,8 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := Item{}
-	err = dbx.Get(&item, "SELECT * FROM `items` WHERE `id` = ?", itemID)
+	item := ItemUser{}
+	err = dbx.Select(&item, "SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `items`.`id` = ?", itemID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "item not found")
 		return
@@ -1133,16 +1133,15 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	seller, err := getUserSimpleByID(dbx, item.SellerID)
-	if err != nil {
-		outputErrorMsg(w, http.StatusNotFound, "seller not found")
-		return
-	}
+	seller := new(UserSimple)
+	seller.ID = item.UserID
+	seller.AccountName = item.AccountName
+	seller.NumSellItems = item.NumSellItems
 
 	itemDetail := ItemDetail{
 		ID:       item.ID,
 		SellerID: item.SellerID,
-		Seller:   &seller,
+		Seller:   seller,
 		// BuyerID
 		// Buyer
 		Status:      item.Status,
