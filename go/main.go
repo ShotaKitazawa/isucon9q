@@ -1108,8 +1108,8 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := ItemUser{}
-	err = dbx.Select(&item, "SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.id = ?", itemID)
+	items := []ItemUser{}
+	err = dbx.Select(&items, "SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.id = ?", itemID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "item not found")
 		return
@@ -1127,47 +1127,47 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	*/
-	category, ok := getCategoryByIDCache[item.CategoryID]
+	category, ok := getCategoryByIDCache[items[0].CategoryID]
 	if !ok {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
 	}
 
 	seller := new(UserSimple)
-	seller.ID = item.UserID
-	seller.AccountName = item.AccountName
-	seller.NumSellItems = item.NumSellItems
+	seller.ID = items[0].UserID
+	seller.AccountName = items[0].AccountName
+	seller.NumSellItems = items[0].NumSellItems
 
 	itemDetail := ItemDetail{
-		ID:       item.ID,
-		SellerID: item.SellerID,
+		ID:       items[0].ID,
+		SellerID: items[0].SellerID,
 		Seller:   seller,
 		// BuyerID
 		// Buyer
-		Status:      item.Status,
-		Name:        item.Name,
-		Price:       item.Price,
-		Description: item.Description,
-		ImageURL:    getImageURL(item.ImageName),
-		CategoryID:  item.CategoryID,
+		Status:      items[0].Status,
+		Name:        items[0].Name,
+		Price:       items[0].Price,
+		Description: items[0].Description,
+		ImageURL:    getImageURL(items[0].ImageName),
+		CategoryID:  items[0].CategoryID,
 		// TransactionEvidenceID
 		// TransactionEvidenceStatus
 		// ShippingStatus
 		Category:  &category,
-		CreatedAt: item.CreatedAt.Unix(),
+		CreatedAt: items[0].CreatedAt.Unix(),
 	}
 
-	if (user.ID == item.SellerID || user.ID == item.BuyerID) && item.BuyerID != 0 {
-		buyer, err := getUserSimpleByID(dbx, item.BuyerID)
+	if (user.ID == items[0].SellerID || user.ID == items[0].BuyerID) && items[0].BuyerID != 0 {
+		buyer, err := getUserSimpleByID(dbx, items[0].BuyerID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "buyer not found")
 			return
 		}
-		itemDetail.BuyerID = item.BuyerID
+		itemDetail.BuyerID = items[0].BuyerID
 		itemDetail.Buyer = &buyer
 
 		transactionEvidence := TransactionEvidence{}
-		err = dbx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
+		err = dbx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", items[0].ID)
 		if err != nil && err != sql.ErrNoRows {
 			// It's able to ignore ErrNoRows
 			log.Print(err)
