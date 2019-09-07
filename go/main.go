@@ -64,6 +64,8 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
+
+	getCategoryByIDCache map[int]Category
 )
 
 type Config struct {
@@ -101,16 +103,35 @@ type Item struct {
 	UpdatedAt   time.Time `json:"-" db:"updated_at"`
 }
 
+
+type ItemUser struct {
+	ID          int64     `json:"id" db:"id"`
+	SellerID    int64     `json:"seller_id" db:"seller_id"`
+	BuyerID     int64     `json:"buyer_id" db:"buyer_id"`
+	Status      string    `json:"status" db:"status"`
+	Name        string    `json:"name" db:"name"`
+	Price       int       `json:"price" db:"price"`
+	Description string    `json:"description" db:"description"`
+	ImageName   string    `json:"image_name" db:"image_name"`
+	CategoryID  int       `json:"category_id" db:"category_id"`
+	CreatedAt   time.Time `json:"-" db:"created_at"`
+	UpdatedAt   time.Time `json:"-" db:"updated_at"`
+
+	UserID           int64  `db:"user_id"`
+	AccountName  string `db:"user_account_name"`
+	NumSellItems int    `db:"user_num_sell_items"`
+}
+
 type ItemSimple struct {
 	ID         int64       `json:"id"`
 	SellerID   int64       `json:"seller_id"`
-	Seller     *UserSimple `json:"seller"`
+	Seller     *UserSimple `json:"seller,omitempty"`
 	Status     string      `json:"status"`
 	Name       string      `json:"name"`
 	Price      int         `json:"price"`
 	ImageURL   string      `json:"image_url"`
 	CategoryID int         `json:"category_id"`
-	Category   *Category   `json:"category"`
+	Category   *Category   `json:"category,omitempty"`
 	CreatedAt  int64       `json:"created_at"`
 }
 
@@ -270,17 +291,12 @@ type resSetting struct {
 }
 
 func init() {
+
 	store = sessions.NewCookieStore([]byte("abc"))
-
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-
 	templates = template.Must(template.ParseFiles(
 		"../public/index.html",
 	))
-}
-
-func main() {
-	go http.ListenAndServe(":3000", nil)
 
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
@@ -306,7 +322,6 @@ func main() {
 	if password == "" {
 		password = "isucari"
 	}
-
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&loc=Local",
 		user,
@@ -320,6 +335,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to DB: %s.", err.Error())
 	}
+
+	initCategoryIDCache()
+}
+
+func initCategoryIDCache() {
+	getCategoryByIDCache = make(map[int]Category, 100)
+
+	var category_ids []int
+	err := dbx.Select(&category_ids, "SELECT id FROM `categories`")
+	if err != nil {
+		panic(err)
+	}
+	for _, id := range category_ids {
+		category, _ := getCategoryByID(dbx, id)
+
+		//if err != nil || category.ParentID != 0 {
+		//	panic(errors.New("category not found"))
+		//}
+
+		getCategoryByIDCache[id] = category
+	}
+}
+
+func main() {
+	go http.ListenAndServe(":3000", nil)
+
 	defer dbx.Close()
 
 	mux := goji.NewMux()
@@ -501,6 +542,8 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		Language: "Go",
 	}
 
+	initCategoryIDCache()
+
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 	json.NewEncoder(w).Encode(res)
 }
@@ -567,8 +610,15 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			return
 		}
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
+		/*
+			category, err := getCategoryByID(dbx, item.CategoryID)
+			if err != nil {
+				outputErrorMsg(w, http.StatusNotFound, "category not found")
+				return
+			}
+		*/
+		category, ok := getCategoryByIDCache[item.CategoryID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
@@ -609,8 +659,15 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rootCategory, err := getCategoryByID(dbx, rootCategoryID)
-	if err != nil || rootCategory.ParentID != 0 {
+	/*
+		rootCategory, err := getCategoryByID(dbx, rootCategoryID)
+		if err != nil || rootCategory.ParentID != 0 {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+	*/
+	rootCategory, ok := getCategoryByIDCache[rootCategoryID]
+	if !ok {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
 	}
@@ -649,7 +706,8 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// SELECT * FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `status` IN ('on_sale','sold_out') AND (`items`.`created_at` < '2019-08-12 15:45:39'  OR (`items`.`created_at` <= '2019-08-12 15:45:39' AND `items`.`id` < 49534)) ORDER BY `items`.`created_at` DESC, `items`.`id` DESC LIMIT 1
+			"SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) AND (items.created_at < ?  OR (items.created_at <= ? AND items.id < ?)) ORDER BY items.created_at DESC, items.id DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
@@ -660,13 +718,13 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			outputErrorMsg(w, http.StatusInternalServerError, "db error: paging")
 			return
 		}
 	} else {
 		// 1st page
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY created_at DESC, id DESC LIMIT ?",
+			"SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) ORDER BY items.created_at DESC, items.id DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
@@ -674,36 +732,39 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			outputErrorMsg(w, http.StatusInternalServerError, "db error: 1st page")
 			return
 		}
 	}
 
-	items := []Item{}
+	items := []ItemUser{}
 	err = dbx.Select(&items, inQuery, inArgs...)
 
 	if err != nil {
 		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		log.Print(inQuery)
+		log.Print(inArgs)
+		outputErrorMsg(w, http.StatusInternalServerError, "db error: dbx.Select(&items, inQuery, inArgs...)")
 		return
 	}
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
+		seller := new(UserSimple)
+		seller.ID = item.SellerID
+		seller.AccountName = item.AccountName
+		seller.NumSellItems = item.NumSellItems
+
+		category, ok := getCategoryByIDCache[item.CategoryID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
+
 		itemSimples = append(itemSimples, ItemSimple{
 			ID:         item.ID,
 			SellerID:   item.SellerID,
-			Seller:     &seller,
+			Seller:     seller,
 			Status:     item.Status,
 			Name:       item.Name,
 			Price:      item.Price,
@@ -805,8 +866,15 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
+		/*
+			category, err := getCategoryByID(dbx, item.CategoryID)
+			if err != nil {
+				outputErrorMsg(w, http.StatusNotFound, "category not found")
+				return
+			}
+		*/
+		category, ok := getCategoryByIDCache[item.CategoryID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
@@ -923,10 +991,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		category, err := getCategoryByID(tx, item.CategoryID)
-		if err != nil {
+		/*
+			category, err := getCategoryByID(tx, item.CategoryID)
+			if err != nil {
+				outputErrorMsg(w, http.StatusNotFound, "category not found")
+				tx.Rollback()
+				return
+			}
+		*/
+		category, ok := getCategoryByIDCache[item.CategoryID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			tx.Rollback()
 			return
 		}
 
@@ -1045,8 +1120,15 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := getCategoryByID(dbx, item.CategoryID)
-	if err != nil {
+	/*
+		category, err := getCategoryByID(dbx, item.CategoryID)
+		if err != nil {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+	*/
+	category, ok := getCategoryByIDCache[item.CategoryID]
+	if !ok {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
 	}
