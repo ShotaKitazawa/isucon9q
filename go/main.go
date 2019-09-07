@@ -22,6 +22,8 @@ import (
 	goji "goji.io"
 	"goji.io/pat"
 	"golang.org/x/crypto/bcrypt"
+	redistore "gopkg.in/boj/redistore.v1"
+	//"gopkg.in/boj/redistore.v1"
 )
 
 const (
@@ -64,6 +66,7 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
+	//pool      *redis.Pool
 )
 
 type Config struct {
@@ -270,13 +273,30 @@ type resSetting struct {
 }
 
 func init() {
-	store = sessions.NewCookieStore([]byte("abc"))
+	var err error
+
+	//store = sessions.NewCookieStore([]byte("abc"))
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "127.0.0.1:6379"
+	}
+	store, err = redistore.NewRediStore(10, "tcp", redisHost, "", []byte("abc"))
+	if err != nil {
+		panic(err)
+	}
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	templates = template.Must(template.ParseFiles(
 		"../public/index.html",
 	))
+
+	//pool = &redis.Pool{
+	//	MaxIdel:     3,
+	//	MaxActive:   0,
+	//	IdleTimeout: 240 * time.Second,
+	//	Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", redisHost) },
+	//}
 }
 
 func main() {
