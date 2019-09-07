@@ -23,7 +23,8 @@ import (
 	"goji.io/pat"
 	"golang.org/x/crypto/bcrypt"
 	redistore "gopkg.in/boj/redistore.v1"
-	//"gopkg.in/boj/redistore.v1"
+
+	"github.com/gomodule/redigo/redis"
 )
 
 const (
@@ -66,7 +67,8 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
-	//pool      *redis.Pool
+	pool      *redis.Pool
+
 	getCategoryByIDCache map[int]Category
 )
 
@@ -310,12 +312,12 @@ func init() {
 		"../public/index.html",
 	))
 
-	//pool = &redis.Pool{
-	//	MaxIdel:     3,
-	//	MaxActive:   0,
-	//	IdleTimeout: 240 * time.Second,
-	//	Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", redisHost) },
-	//}
+	pool = &redis.Pool{
+		MaxIdle:     3,
+		MaxActive:   0,
+		IdleTimeout: 240 * time.Second,
+		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", redisHost) },
+	}
 
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
@@ -359,9 +361,9 @@ func init() {
 }
 
 func initCategoryIDCache() {
-	getCategoryByIDCache = make(map[int]Category, 100)
+	//getCategoryByIDCache = make(map[int]Category, 100)
 
-	var category_ids []int
+  var category_ids []int
 	err := dbx.Select(&category_ids, "SELECT id FROM `categories`")
 	if err != nil {
 		panic(err)
@@ -373,7 +375,17 @@ func initCategoryIDCache() {
 		//	panic(errors.New("category not found"))
 		//}
 
-		getCategoryByIDCache[id] = category
+		//getCategoryByIDCache[id] = category
+
+		conn := pool.Get()
+		defer conn.Close()
+
+		data, err := json.Marshal(&category)
+		if err != nil {
+			panic(err)
+		}
+		conn.Do("SET", fmt.Sprintf("getCategoryByID_%d", id), data)
+
 	}
 }
 
@@ -629,18 +641,21 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			return
 		}
-		/*
-			category, err := getCategoryByID(dbx, item.CategoryID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "category not found")
-				return
-			}
-		*/
-		category, ok := getCategoryByIDCache[item.CategoryID]
-		if !ok {
+
+		var category Category
+		conn := pool.Get()
+		data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
+		conn.Close()
+
+		if err != nil || data == nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
+		if err := json.Unmarshal(data, &category); err != nil {
+      outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+
 		itemSimples = append(itemSimples, ItemSimple{
 			ID:         item.ID,
 			SellerID:   item.SellerID,
@@ -678,15 +693,16 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*
-		rootCategory, err := getCategoryByID(dbx, rootCategoryID)
-		if err != nil || rootCategory.ParentID != 0 {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			return
-		}
-	*/
-	rootCategory, ok := getCategoryByIDCache[rootCategoryID]
-	if !ok {
+	var rootCategory Category
+	conn := pool.Get()
+	data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", rootCategoryID)))
+	conn.Close()
+
+	if err != nil || data == nil {
+		outputErrorMsg(w, http.StatusNotFound, "category not found")
+		return
+	}
+	if err := json.Unmarshal(data, &rootCategory); err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
 	}
@@ -774,8 +790,16 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		seller.AccountName = item.AccountName
 		seller.NumSellItems = item.NumSellItems
 
-		category, ok := getCategoryByIDCache[item.CategoryID]
-		if !ok {
+		var category Category
+		conn := pool.Get()
+		data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
+		conn.Close()
+
+		if err != nil || data == nil {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+		if err := json.Unmarshal(data, &category); err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
@@ -885,18 +909,20 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		/*
-			category, err := getCategoryByID(dbx, item.CategoryID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "category not found")
-				return
-			}
-		*/
-		category, ok := getCategoryByIDCache[item.CategoryID]
-		if !ok {
+		var category Category
+		conn := pool.Get()
+		data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
+		conn.Close()
+
+		if err != nil || data == nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
+		if err := json.Unmarshal(data, &category); err != nil {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+
 		itemSimples = append(itemSimples, ItemSimple{
 			ID:         item.ID,
 			SellerID:   item.SellerID,
@@ -1010,16 +1036,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		/*
-			category, err := getCategoryByID(tx, item.CategoryID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "category not found")
-				tx.Rollback()
-				return
-			}
-		*/
-		category, ok := getCategoryByIDCache[item.CategoryID]
-		if !ok {
+
+    var category Category
+		conn := pool.Get()
+		data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
+		conn.Close()
+
+		if err != nil || data == nil {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
+		if err := json.Unmarshal(data, &category); err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
@@ -1139,15 +1166,16 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*
-		category, err := getCategoryByID(dbx, item.CategoryID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			return
-		}
-	*/
-	category, ok := getCategoryByIDCache[item.CategoryID]
-	if !ok {
+	var category Category
+	conn := pool.Get()
+	data, err := redis.Bytes(conn.Do("GET", fmt.Sprintf("getCategoryByID_%d", item.CategoryID)))
+	conn.Close()
+
+	if err != nil || data == nil {
+		outputErrorMsg(w, http.StatusNotFound, "category not found")
+		return
+	}
+	if err := json.Unmarshal(data, &category); err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
 	}
