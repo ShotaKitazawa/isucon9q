@@ -741,14 +741,12 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
-			// SELECT * FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `status` IN ('on_sale','sold_out') AND (`items`.`created_at` < '2019-08-12 15:45:39'  OR (`items`.`created_at` <= '2019-08-12 15:45:39' AND `items`.`id` < 49534)) ORDER BY `items`.`created_at` DESC, `items`.`id` DESC LIMIT 1
-			"SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) AND (items.created_at < ?  OR (items.created_at <= ? AND items.id < ?)) ORDER BY items.created_at DESC, items.id DESC LIMIT ?",
+			"SELECT items.*, users.id \"user_id\", users.account_name \"user_account_name\", users.num_sell_items \"user_num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) AND (items.created_at < ?) ORDER BY items.created_at DESC, items.id DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
-			itemID,
 			ItemsPerPage+1,
 		)
 		if err != nil {
