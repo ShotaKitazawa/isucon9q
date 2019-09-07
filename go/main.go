@@ -334,7 +334,7 @@ func initCategoryIDCache() {
 		fmt.Println("--------")
 		fmt.Printf("Category: ID: %d\n", id)
 		fmt.Printf("rootCategory: ID: %d\n", rootCategory.ID)
-		fmt.Printf("rootCategory: parentID: %d\n", rootCategory.ID)
+		fmt.Printf("rootCategory: parentID: %d\n", rootCategory.ParentID)
 		fmt.Printf("rootCategory: CategoryName: %s\n", rootCategory.CategoryName)
 		fmt.Printf("rootCategory: ParentCategoryName: %s\n", rootCategory.ParentCategoryName)
 
