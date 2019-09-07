@@ -667,7 +667,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			outputErrorMsg(w, http.StatusInternalServerError, "db error: paging")
 			return
 		}
 	} else {
@@ -681,7 +681,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			outputErrorMsg(w, http.StatusInternalServerError, "db error: 1st page")
 			return
 		}
 	}
@@ -691,7 +691,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		outputErrorMsg(w, http.StatusInternalServerError, "db error: dbx.Select(&items, inQuery, inArgs...)")
 		return
 	}
 
