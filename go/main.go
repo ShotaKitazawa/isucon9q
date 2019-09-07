@@ -101,6 +101,12 @@ type Item struct {
 	UpdatedAt   time.Time `json:"-" db:"updated_at"`
 }
 
+
+type ItemUser struct {
+	Item Item `json:"-" db:"items"`
+	UserSimple UserSimple `json:"-" db:"users"`
+}
+
 type ItemSimple struct {
 	ID         int64       `json:"id"`
 	SellerID   int64       `json:"seller_id"`
@@ -649,7 +655,8 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// SELECT * FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `status` IN ('on_sale','sold_out') AND (`items`.`created_at` < '2019-08-12 15:45:39'  OR (`items`.`created_at` <= '2019-08-12 15:45:39' AND `items`.`id` < 49534)) ORDER BY `items`.`created_at` DESC, `items`.`id` DESC LIMIT 1
+			"SELECT`items`.*, `users`.`id` \"user.id\", `users`.`account_name` \"user.account_name\", `users`.`num_sell_items` \"user.num_sell_items\" FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `items`.`status` IN (?,?) AND `items`.`category_id` IN (?) AND (`items`.`created_at` < ?  OR (`items`.`created_at` <= ? AND `items`.`id` < ?)) ORDER BY `items`.`created_at` DESC, `items`.`id` DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
@@ -666,7 +673,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY created_at DESC, id DESC LIMIT ?",
+			"SELECT `items`.*, `users`.`id` \"user.id\", `users`.`account_name` \"user.account_name\", `users`.`num_sell_items` \"user.num_sell_items\" FROM `items` INNER JOIN `users` ON `items`.`seller_id` = `users`.`id` WHERE `items`.`status` IN (?,?) AND `items`.`category_id` IN (?) ORDER BY `items`.`created_at` DESC, `items`.`id` DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
@@ -679,7 +686,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items := []Item{}
+	items := []ItemUser{}
 	err = dbx.Select(&items, inQuery, inArgs...)
 
 	if err != nil {
@@ -690,15 +697,27 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
+		seller := new(UserSimple)
+		seller.ID = item.Item.SellerID
+		seller.AccountName = item.UserSimple.AccountName
+		seller.NumSellItems = item.UserSimple.NumSellItems
+
+		category, err := getCategoryByID(dbx, item.Item.CategoryID)
+		if err != nil {
+			outputErrorMsg(w, http.StatusNotFound, "category not found")
+			return
+		}
 		itemSimples = append(itemSimples, ItemSimple{
-			ID:         item.ID,
-			SellerID:   item.SellerID,
-			Status:     item.Status,
-			Name:       item.Name,
-			Price:      item.Price,
-			ImageURL:   getImageURL(item.ImageName),
-			CategoryID: item.CategoryID,
-			CreatedAt:  item.CreatedAt.Unix(),
+			ID:         item.Item.ID,
+			SellerID:   item.Item.SellerID,
+			Seller:     seller,
+			Status:     item.Item.Status,
+			Name:       item.Item.Name,
+			Price:      item.Item.Price,
+			ImageURL:   getImageURL(item.Item.ImageName),
+			CategoryID: item.Item.CategoryID,
+			Category:   &category,
+			CreatedAt:  item.Item.CreatedAt.Unix(),
 		})
 	}
 
