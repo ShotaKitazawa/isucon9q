@@ -1903,29 +1903,34 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	if csrfToken != getCSRFToken(r) {
+		log.Print("postSell Error: csrf token error")
 		outputErrorMsg(w, http.StatusUnprocessableEntity, "csrf token error")
 		return
 	}
 
 	categoryID, err := strconv.Atoi(categoryIDStr)
 	if err != nil || categoryID < 0 {
+		log.Print("postSell Error: category id error")
 		outputErrorMsg(w, http.StatusBadRequest, "category id error")
 		return
 	}
 
 	price, err := strconv.Atoi(priceStr)
 	if err != nil {
+		log.Print("postSell Error: price error")
 		outputErrorMsg(w, http.StatusBadRequest, "price error")
 		return
 	}
 
 	if name == "" || description == "" || price == 0 || categoryID == 0 {
+		log.Print("postSell Error: all parameters are required")
 		outputErrorMsg(w, http.StatusBadRequest, "all parameters are required")
 
 		return
 	}
 
 	if price < ItemMinPrice || price > ItemMaxPrice {
+		log.Print("postSell Error: " + ItemPriceErrMsg)
 		outputErrorMsg(w, http.StatusBadRequest, ItemPriceErrMsg)
 
 		return
@@ -1940,6 +1945,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 
 	user, errCode, errMsg := getUser(r)
 	if errMsg != "" {
+		log.Print("postSell Error: " + errMsg)
 		outputErrorMsg(w, errCode, errMsg)
 		return
 	}
@@ -1954,6 +1960,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	ext := filepath.Ext(header.Filename)
 
 	if !(ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif") {
+		log.Print("postSell Error: unsupported image format error")
 		outputErrorMsg(w, http.StatusBadRequest, "unsupported image format error")
 		return
 	}
@@ -1975,6 +1982,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	seller := User{}
 	err = tx.Get(&seller, "SELECT * FROM `users` WHERE `id` = ? FOR UPDATE", user.ID)
 	if err == sql.ErrNoRows {
+		log.Print("postSell Error: user not found")
 		outputErrorMsg(w, http.StatusNotFound, "user not found")
 		tx.Rollback()
 		return
@@ -2173,6 +2181,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	rl := reqLogin{}
 	err := json.NewDecoder(r.Body).Decode(&rl)
 	if err != nil {
+		log.Print("postLogin: json decode error")
 		outputErrorMsg(w, http.StatusBadRequest, "json decode error")
 		return
 	}
@@ -2181,6 +2190,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	password := rl.Password
 
 	if accountName == "" || password == "" {
+		log.Print("postLogin: all parameters are required")
 		outputErrorMsg(w, http.StatusBadRequest, "all parameters are required")
 
 		return
@@ -2189,6 +2199,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	u := User{}
 	err = dbx.Get(&u, "SELECT * FROM `users` WHERE `account_name` = ?", accountName)
 	if err == sql.ErrNoRows {
+		log.Print("postLogin: アカウント名かパスワードが間違えています")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
@@ -2201,6 +2212,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 
 	err = bcrypt.CompareHashAndPassword(u.HashedPassword, []byte(password))
 	if err == bcrypt.ErrMismatchedHashAndPassword {
+		log.Print("postLogin: アカウント名かパスワードが間違えています")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
