@@ -673,7 +673,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT items.*, users.id \"users.id\", users.account_name \"users.account_name\", users.num_sell_items \"users.num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) ORDER BY items.created_at DESC, items.id DESC LIMIT ?,",
+			"SELECT items.*, users.id \"users.id\", users.account_name \"users.account_name\", users.num_sell_items \"users.num_sell_items\" FROM items INNER JOIN users ON items.seller_id = users.id WHERE items.status IN (?,?) AND items.category_id IN (?) ORDER BY items.created_at DESC, items.id DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
