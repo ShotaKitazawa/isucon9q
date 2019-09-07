@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
@@ -149,10 +150,12 @@ func APIShipmentRequest(shipmentURL string, param *APIShipmentRequestReq) ([]byt
 }
 
 func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShipmentStatusRes, error) {
+	log.Print("DEBEG: ReserveID %s", param.ReserveID)
 	b, _ := json.Marshal(param)
 
 	req, err := http.NewRequest(http.MethodGet, shipmentURL+"/status", bytes.NewBuffer(b))
 	if err != nil {
+		log.Print("AAAAAA")
 		return nil, err
 	}
 
@@ -162,6 +165,7 @@ func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShi
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.Print("BBBBBB")
 		return nil, err
 	}
 	defer res.Body.Close()
@@ -169,14 +173,17 @@ func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShi
 	if res.StatusCode != http.StatusOK {
 		b, err := ioutil.ReadAll(res.Body)
 		if err != nil {
+			log.Print("CCCCCC")
 			return nil, fmt.Errorf("failed to read res.Body and the status code of the response from shipment service was not 200: %v", err)
 		}
+		log.Print("DDDDD")
 		return nil, fmt.Errorf("status code: %d; body: %s", res.StatusCode, b)
 	}
 
 	ssr := &APIShipmentStatusRes{}
 	err = json.NewDecoder(res.Body).Decode(&ssr)
 	if err != nil {
+		log.Print("EEEEE")
 		return nil, err
 	}
 
