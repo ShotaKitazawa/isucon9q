@@ -332,8 +332,12 @@ func initCategoryIDCache() {
 	for _, id := range category_ids {
 		rootCategory, err := getCategoryByID(dbx, id)
 		fmt.Println("--------")
-		fmt.Printf("Category: %d\n", id)
-		fmt.Printf("rootCategory: %d\n", rootCategory.ID)
+		fmt.Printf("Category: ID: %d\n", id)
+		fmt.Printf("rootCategory: ID: %d\n", rootCategory.ID)
+		fmt.Printf("rootCategory: parentID: %d\n", rootCategory.ID)
+		fmt.Printf("rootCategory: CategoryName: %s\n", rootCategory.CategoryName)
+		fmt.Printf("rootCategory: ParentCategoryName: %s\n", rootCategory.ParentCategoryName)
+
 		if err != nil || rootCategory.ParentID != 0 {
 			panic(errors.New("category not found"))
 		}
@@ -435,7 +439,6 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
-	fmt.Println(categoryID)
 	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
 	if category.ParentID != 0 {
 		parentCategory, err := getCategoryByID(q, category.ParentID)
