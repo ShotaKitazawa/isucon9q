@@ -1950,7 +1950,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if price < ItemMinPrice || price > ItemMaxPrice {
-		log.Print("postSell Error: " + ItemPriceErrMsg)
+		log.Print("postSell Error: 1 " + ItemPriceErrMsg)
 		outputErrorMsg(w, http.StatusBadRequest, ItemPriceErrMsg)
 
 		return
@@ -1965,7 +1965,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 
 	user, errCode, errMsg := getUser(r)
 	if errMsg != "" {
-		log.Print("postSell Error: " + errMsg)
+		log.Print("postSell Error: 2 " + errMsg)
 		outputErrorMsg(w, errCode, errMsg)
 		return
 	}
@@ -2219,7 +2219,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	u := User{}
 	err = dbx.Get(&u, "SELECT * FROM `users` WHERE `account_name` = ?", accountName)
 	if err == sql.ErrNoRows {
-		log.Print("postLogin: アカウント名かパスワードが間違えています")
+		log.Print("postLogin: アカウント名かパスワードが間違えています1")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
@@ -2232,7 +2232,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 
 	err = bcrypt.CompareHashAndPassword(u.HashedPassword, []byte(password))
 	if err == bcrypt.ErrMismatchedHashAndPassword {
-		log.Print("postLogin: アカウント名かパスワードが間違えています")
+		log.Print("postLogin: アカウント名かパスワードが間違えています2")
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
 	}
